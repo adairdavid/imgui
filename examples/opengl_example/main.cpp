@@ -3,7 +3,7 @@
 #include "../../imgui.h"
 
 // glew & glfw
-#define GLEW_STATIC
+//#define GLEW_STATIC
 #include <GL/glew.h>
 #include <SDL2/SDL.h>
 
@@ -75,7 +75,6 @@ static void ImImpl_RenderDrawLists(ImDrawList** const cmd_lists, int cmd_lists_c
 
 void InitGL()
 {
-  SDL_Init(SDL_INIT_EVERYTHING);
   SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
   SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
   SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
@@ -84,12 +83,19 @@ void InitGL()
   SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
   SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK,
       SDL_GL_CONTEXT_PROFILE_CORE);
+
+  SDL_Init(SDL_INIT_EVERYTHING);
+
   window = SDL_CreateWindow("SDL IMGui Example.",
       SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720,
       SDL_WINDOW_OPENGL);
   context = SDL_GL_CreateContext(window);
 
-  glewInit();
+  glewExperimental = GL_TRUE;
+  GLenum status = glewInit();
+  if (status != GLEW_OK) {
+    printf("Could not initialize GLEW!\n");
+  }
 }
 
 void InitImGui()
@@ -104,24 +110,6 @@ void InitImGui()
   ImGuiIO& io = ImGui::GetIO();
   io.DisplaySize = ImVec2((float)fb_w, (float)fb_h);  // Display size, in pixels. For clamping windows positions.
   io.PixelCenterOffset = 0.0f;                        // Align OpenGL texels
-
-  io.KeyMap[ImGuiKey_Tab] = SDLK_TAB;             // Keyboard mapping. ImGui will use those indices to peek into the io.KeyDown[] array.
-  io.KeyMap[ImGuiKey_LeftArrow] = SDLK_LEFT;
-  io.KeyMap[ImGuiKey_RightArrow] = SDLK_RIGHT;
-  io.KeyMap[ImGuiKey_UpArrow] = SDLK_UP;
-  io.KeyMap[ImGuiKey_DownArrow] = SDLK_DOWN;
-  io.KeyMap[ImGuiKey_Home] = SDLK_HOME;
-  io.KeyMap[ImGuiKey_End] = SDLK_END;
-  io.KeyMap[ImGuiKey_Delete] = SDLK_DELETE;
-  io.KeyMap[ImGuiKey_Backspace] = SDLK_BACKSPACE;
-  io.KeyMap[ImGuiKey_Enter] = SDLK_RETURN;
-  io.KeyMap[ImGuiKey_Escape] = SDLK_ESCAPE;
-  io.KeyMap[ImGuiKey_A] = SDLK_a;
-  io.KeyMap[ImGuiKey_C] = SDLK_c;
-  io.KeyMap[ImGuiKey_V] = SDLK_v;
-  io.KeyMap[ImGuiKey_X] = SDLK_x;
-  io.KeyMap[ImGuiKey_Y] = SDLK_y;
-  io.KeyMap[ImGuiKey_Z] = SDLK_z;
 
   io.RenderDrawListsFn = ImImpl_RenderDrawLists;
 
@@ -147,14 +135,17 @@ void UpdateImGui()
 {
   ImGuiIO& io = ImGui::GetIO();
 
+  SDL_PumpEvents();
+
   // Setup inputs
   // (we already got mouse wheel, keyboard keys & characters from glfw callbacks polled in glfwPollEvents())
   int mouse_x, mouse_y;
   SDL_GetMouseState(&mouse_x, &mouse_y);
+
   io.MousePos = ImVec2((float)mouse_x * mousePosScale.x, (float)mouse_y * mousePosScale.y);      // Mouse position, in pixels (set to -1,-1 if no mouse / on another screen, etc.)
 
-  io.MouseDown[0] = mousePressed[0] || SDL_BUTTON(SDL_BUTTON_LEFT);
-  io.MouseDown[1] = mousePressed[1] || SDL_BUTTON(SDL_BUTTON_RIGHT);
+  io.MouseDown[0] = mousePressed[0] || (SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_LEFT));
+  io.MouseDown[1] = mousePressed[1] || (SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_RIGHT));
 
   // Start the frame
   ImGui::NewFrame();
@@ -181,18 +172,24 @@ int main(int argc, char** argv)
 
     UpdateImGui();
 
-    {
-      static float f;
-      ImGui::Text("Hello, world!");
-      ImGui::SetWindowFontScale(2.0f);
+    ImGui::Begin("Debug");
+    ImGui::Text("Hello, world %d", 123);
+    if (ImGui::Button("OK")) {
+      std::cout << "Button clicked!\n";
     }
+    ImGui::End();
 
     // Rendering
-    glViewport(0, 0, (int)io.DisplaySize.x, (int)io.DisplaySize.y);
     glClearColor(0.8f, 0.6f, 0.6f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 
     ImGui::Render();
+
+    GLenum error = glGetError();
+    if (error != GL_NO_ERROR) {
+      std::cout << gluErrorString(error) << std::endl;
+    }
+
     SDL_GL_SwapWindow(window);
   }
 
